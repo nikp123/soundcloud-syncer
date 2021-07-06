@@ -6,7 +6,7 @@ OVERWRITE=0
 
 function fix_genre() {
 	declare -n ret=$1
-
+	
 	# lowercase everything and give the first letter in the word an uppercase
 	ret=${ret,,}
 	ret=$(echo "$ret" | sed 's/[^ _-]*/\u&/g')
@@ -16,11 +16,11 @@ function fix_genre() {
 	ret=${ret/110 Bpm/Glitch}
 	ret=${ret/110bpm/Glitch}
 	ret=${ret/Glitch Hop/Glitch}
-
+	
 	ret=${ret/Chill Out/Chillout}
-
+	
 	ret=${ret/Dance & EDM/Dance}
-
+	
 	ret=${ret/Drum And Bass/Drum & Bass}
 	ret=${ret/Drumstep/Drum & Bass} # Technically a subgenre, don't argue
 	ret=${ret/Melodic Drumstep/Drum & Bass}
@@ -41,28 +41,28 @@ function fix_genre() {
 	ret=${ret/Breakbeatbeat/Breakbeat} # cancerous code
 
 	ret=${ret/Electronica/Electronic} # Electronica is not a genre, but rather a term
-
+	
 	ret=${ret/Tropical House/House} # double subgenre, wow
 
 	ret=${ret/Electronic House/Electro House}
 	ret=${ret/Complextro/Electro House}
 
 	ret=${ret/Electro Pop/Synthpop}
-
+	
 	ret=${ret/FutureBass/Future Bass}
 	ret=${ret/Midtempo \/ Future Bass/Future Bass}
 
 	ret=${ret/Hard Dance/Hard House} # this is retarded, but whatever
 
 	ret=${ret/Melodic Dubstep/Dubstep}
-
+	
 	ret=${ret/Melodic/Instrumental}
 	ret=${ret/Piano/Instrumental}
-
+	
 	ret=${ret/Post Rock/Post-Rock}
 
 	ret=${ret/Progressive House/House}
-
+	
 	ret=${ret/Progressive Trance/Trance}
 	ret=${ret/Future Trance/Trance}
 
@@ -73,8 +73,8 @@ function fix_genre() {
 	ret=${ret/Future Trap/Trap} # why do artists do weird shit like this
 
 	ret=${ret/hiphop/Hip-Hop}
-
-
+	
+	
 	# check if that genre is valid against the list
 	# genre list provided by https://en.wikipedia.org/wiki/ID3 
 	FOUND=0
@@ -92,16 +92,16 @@ function fix_genre() {
 	# https://en.wikipedia.org/wiki/UK_hardcore (aka. UK Hardcore)
 	# https://en.wikipedia.org/wiki/Pop_punk (aka. Pop Punk)
 	GENRES_LIST="$GENRES_LIST \"Indie Dance\" \"Electro House\" \"Future Bass\" \"Future House\" \"Glitch\" \"Happy Hardcore\" \"Hard House\" \"Synthwave\" \"Trap\" \"UK Hardcore\" \"Pop Punk\""
-
+	
 	eval 'for word in '$GENRES_LIST'; do 
 		if [ "$word" == "$ret" ]; then
 			FOUND=1;
 		fi;
 	done'
 	if (( FOUND == 0 )); then
-		#printf "\n$ret is not a valid genre." 
+		printf "\n$ret is not a valid genre." 
 		ret="INVALID_GENRE"
-	fi
+	fi	
 }
 
 function fix_author_and_title() {
@@ -135,7 +135,7 @@ echo "done"
 # Getting info about likes
 echo -n "Downloading song info: "
 number_of_likes=$(echo $userinfo|jq -r '.public_favorites_count')
-address="http://api.soundcloud.com/users/$username/favorites?client_id=$client_id&limit=200&linked_partitioning=1"
+address="https://api.soundcloud.com/users/$username/favorites?client_id=$client_id&limit=200&linked_partitioning=1"
 j=0
 lastcount=0
 echo "done"
@@ -153,7 +153,7 @@ echo "done"
 (( m-- ))
 
 # insert them into the database
-address="http://api.soundcloud.com/users/$username/favorites?client_id=$client_id&limit=200&linked_partitioning=1"
+address="https://api.soundcloud.com/users/$username/favorites?client_id=$client_id&limit=200&linked_partitioning=1"
 for (( i=0; i<number_of_likes; i+=200 )); do
 	IFS=$' '
 	# 200 is the undocumented limit of how many songs can be pulled from a single query
@@ -161,7 +161,7 @@ for (( i=0; i<number_of_likes; i+=200 )); do
 	listcount=$(echo $list|jq '.collection | length')
 	(( maxcount+=listcount ))
 	address=$(echo $list|jq -r '.next_href')
-
+	
 	echo -n "Getting info about $listcount/$m tracks: "
 	stream_title="$(echo $list|jq -r '.collection[].title'|tr \| '-'|sed -e 's/;/ - /g'|tr -d '?'|sed -e 's/:/ -/g')"
 	IFS=$'\n' stream_title=($stream_title)
@@ -173,8 +173,9 @@ for (( i=0; i<number_of_likes; i+=200 )); do
 
 	(( lastcount+=j ))
 	for (( j=0; j<listcount; j++ )); do
+	 
 		fix_author_and_title
-
+		
 		# song filename
 		filename="${stream_title[$j]}.mp3"
 
@@ -215,7 +216,7 @@ for (( i=0; i<number_of_likes; i+=200 )); do
 			fi
 		fi
 		echo -n "."
-
+		
 		# Get genre information from SoundCloud
 		genre="$(echo $list|jq -r ".collection[$j].genre")"
 		fix_genre genre
@@ -241,10 +242,10 @@ for (( i=0; i<number_of_likes; i+=200 )); do
 			# Download the actual song
 			curl -L -o "$filename" "$download_url" &> /dev/null
 			echo -n "."
-
+	
 			# fix thumbnails so they are actually acceptable
 			thumbnail_url[j]=$(echo -e "${thumbnail_url[$j]}"|sed "s/large/t500x500/g")
-
+			
 			# download the artwork
 			curl -o artwork.jpg ${thumbnail_url[$j]} &> /dev/null
 			if [ ! -f artwork.jpg ]; then
@@ -252,13 +253,12 @@ for (( i=0; i<number_of_likes; i+=200 )); do
 				curl -o artwork.jpg ${thumbnail_url[$j]} &> /dev/null
 			fi
 			echo -n "."
-
+			
 			#echo "Adding $j $stream_pos ${stream_url[$j]} ${stream_title[$j]} ${durstion[$j]} ${author[$j]} ${thumbnail_url[$j]}"
 			# Set mp3 ID3 tag information properly
-			# -c "${description[$j]}"
-			eyeD3 -a "${author[$j]}" -t "${stream_title[$j]}" --add-image "artwork.jpg:FRONT_COVER" -G "$genre" "$filename" &> /dev/null
+			eyeD3 -a "${author[$j]}" -t "${stream_title[$j]}" -c "${description[$j]}" --add-image "artwork.jpg:FRONT_COVER" -G "$genre" "$filename" &> /dev/null
 			echo -n "."
-
+			
 			# Create the directory if it doesn't exist
 			if [ ! -d "${author[$j]}" ]; then
 				mkdir -p "${author[$j]}"

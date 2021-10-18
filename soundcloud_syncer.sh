@@ -14,7 +14,15 @@ if [ -z $auth_token ]; then
 		--data-urlencode "grant_type=client_credentials" \
 		--data client_id=$client_id \
 		--data client_secret=$client_secret \
-		--data grant_type=client_credentials | jq -r '.access_token')
+		--data grant_type=client_credentials 2> /dev/null | jq -r '.access_token')
+
+	if [ $auth_token == 'null' ]; then
+		echo $auth_token
+		echo "You've burned through all of your OAuth tokens. Maybe wait a bit?"
+		exit 1
+	fi
+
+	echo "Here's your token: '$auth_token', you can later reuse it as a 4th argument"
 fi
 
 AUTH_HEADER="Authorization: OAuth $auth_token"
@@ -147,11 +155,16 @@ function fix_author_and_title() {
 # url=$(cat example.json | jq -r ".collection[].purchase_url" | grep album)
 # echo ${url#*"album/"}|cut -d'/' -f1|sed 's/-/ /g;s/ single//g;s/[^ ]*/\u&/g'
 
-sleep 1
-
 echo -n "Getting user info: "
 userinfo=$(curl_wrap "https://api.soundcloud.com/users/$username" 2> /dev/null)
 echo "done"
+
+# Sanity check
+if [ $(echo $userinfo|jq -r '.code') == '401' ]; then
+	echo "This OAuth key has expired. Getting a new one!"
+	$0 $1 $2 $3 # execute self but without the key
+	exit $?
+fi
 
 # Getting info about likes
 echo -n "Downloading song info: "
